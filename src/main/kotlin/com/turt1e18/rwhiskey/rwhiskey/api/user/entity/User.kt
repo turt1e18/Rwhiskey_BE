@@ -9,11 +9,11 @@ import jakarta.persistence.Table
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "user")
+@Table(name = "users")
 class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "UID", nullable = false)
+    @Column(name = "uid", nullable = false)
     var uid: Int? = null,
 
     @Column(name="email",nullable = false, unique = true)

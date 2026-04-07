@@ -11,7 +11,7 @@ import java.time.LocalDate
 class UserToken(
 
     @Id
-    @Column(name = "UID")
+    @Column(name = "uid")
     var uid: Int,
 
     @Column(name="daily_limit")

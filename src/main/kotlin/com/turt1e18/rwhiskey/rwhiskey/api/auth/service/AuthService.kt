@@ -43,7 +43,6 @@ class AuthService(
                 lastResetTime = LocalDate.now()
             )
         )
-
         return SignupResponse(
             uid = saveUser.uid!!,
             email = saveUser.email,

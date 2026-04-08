@@ -1,6 +1,7 @@
 package com.turt1e18.rwhiskey.rwhiskey.api.auth.controller
 
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.SendVerificationEmailRequest
+import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.VerifyEmailCodeRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.EmailVerificationResponse
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.service.EmailVerificationService
 import jakarta.validation.Valid
@@ -20,6 +21,18 @@ class EmailVerificationController(
         @Valid @RequestBody
         request: SendVerificationEmailRequest): ResponseEntity<EmailVerificationResponse> {
         val response = emailVerificationService.sendVerificationEmail(request)
+        return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/verify")
+    fun verifyEmailCode(
+        @Valid @RequestBody
+        request: VerifyEmailCodeRequest
+    ): ResponseEntity<EmailVerificationResponse> {
+        val response = emailVerificationService.verifyEmailCode(
+            email = request.email,
+            inputCode = request.emailCode
+        )
         return ResponseEntity.ok(response)
     }
 }

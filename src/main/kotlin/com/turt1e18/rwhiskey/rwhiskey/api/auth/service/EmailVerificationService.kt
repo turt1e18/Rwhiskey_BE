@@ -5,7 +5,9 @@ import com.resend.services.emails.model.CreateEmailOptions
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.SendVerificationEmailRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.VerifyEmailCodeRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.EmailVerificationResponse
+import com.turt1e18.rwhiskey.rwhiskey.api.auth.repository.EmailVerificationRedisRepository
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import kotlin.random.Random
 
@@ -13,7 +15,9 @@ import kotlin.random.Random
 class EmailVerificationService(
     private val resend: Resend,
     @param:Value("\${resend.from.email}")
-    private val fromEmail: String
+    private val fromEmail: String,
+    private val passwordEncoder: PasswordEncoder,
+    private val emailVerificationRedisRepository: EmailVerificationRedisRepository
 ) {
 
     private fun generateSixDigitCode(): String {
@@ -36,6 +40,13 @@ class EmailVerificationService(
         request: SendVerificationEmailRequest
     ): EmailVerificationResponse {
         val code = generateSixDigitCode()
+        val codeHash= passwordEncoder.encode(code)
+
+        emailVerificationRedisRepository.saveCode(
+            email = request.email,
+            codeHash = codeHash,
+        )
+
         val params = CreateEmailOptions.builder()
             .from(fromEmail)
             .to(request.email)
@@ -49,12 +60,14 @@ class EmailVerificationService(
             println("성공적으로 전송했습니다.: ${response.id}")
             println("생성된 코드: $code")
 
+
             EmailVerificationResponse(
                 success = true,
                 message = "Verification email sent successfully."
             )
         }catch (e: Exception){
-            println("Failed to send verification email: ${e.message}")
+            emailVerificationRedisRepository.deleteCode(request.email)
+            println("이메일 코드 발송이 실패했습니다.: ${e.message}")
 
             EmailVerificationResponse(
                 success = false,
@@ -64,9 +77,35 @@ class EmailVerificationService(
     }
 
     fun verifyEmailCode(
-        request: VerifyEmailCodeRequest
+        email: String,
+        inputCode: String
     ): EmailVerificationResponse {
-        TODO()
+        val savedCodeHash = emailVerificationRedisRepository.getCodeHash(email) ?:
+        return EmailVerificationResponse(
+            success = false,
+            message = "인증에 실패 했습니다. 코드가 없거나 만료되었습니다."
+        )
+        val isMatched = passwordEncoder.matches(inputCode, savedCodeHash)
+        if (!isMatched) {
+            return EmailVerificationResponse(
+                success = false,
+                message = "코드가 일치 하지 않습니다."
+            )
+        }
+        emailVerificationRedisRepository.deleteCode(email)
+        emailVerificationRedisRepository.saveVerified(email)
+
+        return EmailVerificationResponse(
+            success = true,
+            message = "이메일 인증이 완료되었습니다."
+        )
     }
 
+    fun isEmailVerified(email: String): Boolean {
+        return emailVerificationRedisRepository.isVerified(email)
+    }
+
+    fun consumeVerified(email: String){
+        emailVerificationRedisRepository.deleteVerified(email)
+    }
 }

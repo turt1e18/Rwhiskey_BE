@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface UserRepository : JpaRepository<User, Int> {
     fun existsByEmail(email: String): Boolean
+    fun findByEmailAndDeleteDateIsNull(email: String): User?
 }

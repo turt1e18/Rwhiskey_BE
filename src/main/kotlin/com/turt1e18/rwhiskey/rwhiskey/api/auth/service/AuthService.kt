@@ -3,6 +3,7 @@ package com.turt1e18.rwhiskey.rwhiskey.api.auth.service
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.LoginRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.SignupRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.LoginResponse
+import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.MeResponse
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.SignupResponse
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.security.CustomUserPrincipal
 import com.turt1e18.rwhiskey.rwhiskey.api.user.entity.User
@@ -88,5 +89,31 @@ class AuthService(
 
     fun logout(session: HttpSession){
         session.invalidate()
+    }
+
+    fun me(authentication: Authentication?): MeResponse {
+        if (authentication == null || !authentication.isAuthenticated){
+            return MeResponse(
+                authenticated = false,
+                uid = null,
+                email = null,
+                name = null
+            )
+        }
+        val principal = authentication.principal
+        if (principal !is CustomUserPrincipal) {
+            return MeResponse(
+                authenticated = false,
+                uid = null,
+                email = null,
+                name = null
+            )
+        }
+        return MeResponse(
+            authenticated = true,
+            uid = principal.uid,
+            email = principal.username,
+            name = principal.name
+        )
     }
 }

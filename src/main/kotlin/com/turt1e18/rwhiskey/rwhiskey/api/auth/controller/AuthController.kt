@@ -1,6 +1,7 @@
 package com.turt1e18.rwhiskey.rwhiskey.api.auth.controller
 
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.LoginRequest
+import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.ResetPasswordRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.SignupRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.LoginResponse
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.MeResponse
@@ -53,5 +54,13 @@ class AuthController(
     ): ResponseEntity<MeResponse>{
         val response = authService.me(authentication)
         return ResponseEntity.ok(response)
+    }
+
+    @PostMapping("/reset-password")
+    fun resetPassword(
+        @Valid @RequestBody request: ResetPasswordRequest
+    ): ResponseEntity<Map<String, String>> {
+        authService.resetPassword(request)
+        return ResponseEntity.ok(mapOf("message" to "비밀번호가 성공적으로 재설정되었습니다."))
     }
 }

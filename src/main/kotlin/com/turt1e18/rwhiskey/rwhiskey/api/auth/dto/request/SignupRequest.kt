@@ -1,5 +1,6 @@
 package com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
@@ -9,6 +10,7 @@ data class SignupRequest (
     @field:Email(message = "not collect email")
     val email : String,
 
+    @field:JsonProperty("pw")
     @field:NotBlank(message = "password cannot be blank")
     @field:Size(min = 8, max = 32, message = "Message cannot be blank")
     val password : String,

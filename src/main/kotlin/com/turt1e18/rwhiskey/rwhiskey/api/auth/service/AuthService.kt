@@ -1,6 +1,7 @@
 package com.turt1e18.rwhiskey.rwhiskey.api.auth.service
 
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.LoginRequest
+import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.ResetPasswordRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.request.SignupRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.LoginResponse
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.dto.response.MeResponse
@@ -27,6 +28,7 @@ class AuthService(
     private val passwordEncoder: PasswordEncoder,
     private val userTokenRepository: UserTokenRepository,
     private val authenticationManager: AuthenticationManager,
+    private val emailVerificationService: EmailVerificationService,
 ) {
     @Transactional
     fun signUp(request: SignupRequest): SignupResponse {
@@ -60,6 +62,24 @@ class AuthService(
             name = saveUser.name,
             message = "회원가입 완료",
         )
+    }
+
+    @Transactional
+    fun resetPassword(request: ResetPasswordRequest) {
+        // 1. 이메일 인증 여부 확인
+        if (!emailVerificationService.isEmailVerified(request.email)) {
+            throw IllegalStateException("이메일 인증이 완료되지 않았습니다.")
+        }
+
+        // 2. 사용자 조회
+        val user = userRepository.findByEmailAndDeleteDateIsNull(request.email)
+            ?: throw IllegalArgumentException("해당 이메일의 사용자를 찾을 수 없습니다.")
+
+        // 3. 비밀번호 해싱 및 업데이트
+        user.pw = passwordEncoder.encode(request.newPassword)
+
+        // 4. 인증 상태 소모 (재사용 방지)
+        emailVerificationService.consumeVerified(request.email)
     }
 
     fun login(request: LoginRequest, session: HttpSession): LoginResponse {

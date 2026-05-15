@@ -15,12 +15,18 @@ class WhiskeyMaster(
     @Column(name = "w_name", nullable = false, unique = true)
     var whiskeyName: String,
 
+    @Column(name = "w_name_en")
+    var whiskeyNameEn: String? = null,
+
+    @Column(name = "w_main_tag")
+    var mainTag: String? = null,
+
     @Column(name = "w_category")
     var whiskeyCategory: Int?,
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "w_flavor", columnDefinition = "JSON")
-    var whiskeyFlavor: String?,
+    @Column(name = "w_flavor", columnDefinition = "JSONB")
+    var whiskeyFlavor: List<Int>?,
 
     @Column(name = "w_region")
     var whiskeyRegion: Int?,

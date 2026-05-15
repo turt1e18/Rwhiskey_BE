@@ -22,6 +22,9 @@ class UserToken(
 
     @Column(name="last_reset_time")
     var lastResetTime: LocalDate = LocalDate.now(),
+
+    @Column(name="last_action_time")
+    var lastActionTime: java.time.LocalDateTime? = null
 ) {
     /**
      * 날짜가 바뀌었는지 확인하고 사용 횟수를 초기화합니다.

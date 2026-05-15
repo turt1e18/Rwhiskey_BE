@@ -1,12 +1,13 @@
 package com.turt1e18.rwhiskey.rwhiskey.api.recommendation.service
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.turt1e18.rwhiskey.rwhiskey.api.note.entity.TastingNote
+import com.turt1e18.rwhiskey.rwhiskey.api.note.repository.TastingNoteRepository
 import com.turt1e18.rwhiskey.rwhiskey.api.recommendation.dto.request.RecommendationSaveRequest
+import com.turt1e18.rwhiskey.rwhiskey.api.recommendation.dto.response.RecommendationDetailResponse
 import com.turt1e18.rwhiskey.rwhiskey.api.recommendation.entity.ResponseResult
 import com.turt1e18.rwhiskey.rwhiskey.api.recommendation.entity.UserRequest
 import com.turt1e18.rwhiskey.rwhiskey.api.recommendation.repository.ResponseResultRepository
 import com.turt1e18.rwhiskey.rwhiskey.api.recommendation.repository.UserRequestRepository
-import com.turt1e18.rwhiskey.rwhiskey.api.user.entity.UserToken
 import com.turt1e18.rwhiskey.rwhiskey.api.user.repository.UserRepository
 import com.turt1e18.rwhiskey.rwhiskey.api.user.repository.UserTokenRepository
 import com.turt1e18.rwhiskey.rwhiskey.api.whiskey.entity.*
@@ -20,28 +21,20 @@ class RecommendationService(
     private val userRequestRepository: UserRequestRepository,
     private val responseResultRepository: ResponseResultRepository,
     private val whiskeyMasterRepository: WhiskeyMasterRepository,
+    private val tastingNoteRepository: TastingNoteRepository,
     private val userTokenRepository: UserTokenRepository,
     private val categoryTagRepository: CategoryTagRepository,
     private val flavorTagRepository: FlavorTagRepository,
     private val regionTagRepository: RegionTagRepository,
-    private val styleTagRepository: StyleTagRepository,
-    private val objectMapper: ObjectMapper // JSON 변환용
+    private val styleTagRepository: StyleTagRepository
 ) {
 
     @Transactional
     fun saveRecommendation(uid: Int, requestDto: RecommendationSaveRequest): Int {
         val user = userRepository.findById(uid).orElseThrow { IllegalArgumentException("User not found") }
 
-        // 0. 토큰 차감 및 제한 확인
-        val userToken = userTokenRepository.findById(uid).orElseGet {
-            userTokenRepository.save(UserToken(uid = uid))
-        }
-        
-        userToken.use()
-        userTokenRepository.save(userToken)
-
         // 1. 태그 자동 매핑 (이름으로 ID 조회, 없으면 새로 저장하여 Label 보존)
-        val categoryId = requestDto.classification?.let { label ->
+        val categoryId = requestDto.whiskeyCategory?.let { label ->
             categoryTagRepository.findByLabel(label)?.id 
                 ?: categoryTagRepository.save(CategoryTag(label = label)).id
         }
@@ -60,19 +53,20 @@ class RecommendationService(
         val flavorIds = requestDto.featureTags?.map { label ->
             flavorTagRepository.findByLabel(label)?.id
                 ?: flavorTagRepository.save(FlavorTag(label = label)).id
-        }
-        val flavorIdsJson = flavorIds?.let { objectMapper.writeValueAsString(it) }
+        }?.filterNotNull() // List<Int?>? -> List<Int>?
 
         // 2. 위스키 마스터 데이터 자동 업데이트 (위스키 이름 기준)
-        val whiskeyName = requestDto.whiskyName
+        val whiskeyName = requestDto.whiskeyName
         val existingWhiskey = whiskeyMasterRepository.findByWhiskeyName(whiskeyName)
 
         if (existingWhiskey == null) {
             val newWhiskey = WhiskeyMaster(
                 wid = null,
                 whiskeyName = whiskeyName,
+                whiskeyNameEn = requestDto.whiskeyNameEn,
+                mainTag = requestDto.mainTag,
                 whiskeyCategory = categoryId,
-                whiskeyFlavor = flavorIdsJson, // 정규화된 ID 리스트 저장
+                whiskeyFlavor = flavorIds, // 정규화된 ID 리스트 저장
                 whiskeyRegion = regionId,
                 whiskeyStyle = styleId
             )
@@ -80,6 +74,14 @@ class RecommendationService(
         } else {
             // 이미 존재한다면 누락된 정보만 업데이트
             var isUpdated = false
+            if (existingWhiskey.whiskeyNameEn == null && requestDto.whiskeyNameEn != null) {
+                existingWhiskey.whiskeyNameEn = requestDto.whiskeyNameEn
+                isUpdated = true
+            }
+            if (existingWhiskey.mainTag == null && requestDto.mainTag != null) {
+                existingWhiskey.mainTag = requestDto.mainTag
+                isUpdated = true
+            }
             if (existingWhiskey.whiskeyCategory == null && categoryId != null) {
                 existingWhiskey.whiskeyCategory = categoryId
                 isUpdated = true
@@ -92,8 +94,8 @@ class RecommendationService(
                 existingWhiskey.whiskeyStyle = styleId
                 isUpdated = true
             }
-            if (existingWhiskey.whiskeyFlavor == null && flavorIdsJson != null) {
-                existingWhiskey.whiskeyFlavor = flavorIdsJson
+            if (existingWhiskey.whiskeyFlavor == null && flavorIds != null) {
+                existingWhiskey.whiskeyFlavor = flavorIds
                 isUpdated = true
             }
             if (isUpdated) {
@@ -108,22 +110,20 @@ class RecommendationService(
             moodValue = requestDto.moodValue,
             abvValue = requestDto.abvValue,
             additionalValue = requestDto.additionalValue,
-            flexFlag = requestDto.flexFlag
+            flexFlag = requestDto.flexFlag,
+            mainTag = requestDto.mainTag
         )
         val savedRequest = userRequestRepository.save(userRequest)
 
         // 4. 결과 정보 저장 (response_result)
-        // featureTags는 AI가 준 원본 텍스트 리스트를 JSON으로 저장 (히스토리 보존용)
-        val originalTagsJson = requestDto.featureTags?.let { objectMapper.writeValueAsString(it) }
-        
         val responseResult = ResponseResult(
             rid = null,
             userRequest = savedRequest,
             user = user,
-            whiskyName = whiskeyName,
-            whiskyNameEn = requestDto.whiskyNameEn,
-            classification = requestDto.classification,
-            featureTags = originalTagsJson,
+            whiskeyName = whiskeyName,
+            whiskeyNameEn = requestDto.whiskeyNameEn,
+            whiskeyCategory = requestDto.whiskeyCategory,
+            featureTags = requestDto.featureTags,
             regionId = regionId, // 지역 ID 저장
             styleId = styleId,   // 스타일 ID 저장
             foodName = requestDto.foodName,
@@ -133,11 +133,42 @@ class RecommendationService(
         responseResultRepository.save(responseResult)
 
         return savedRequest.oid!!
-    }
+        }
 
     @Transactional
     fun deleteRecommendation(oid: Int) {
         responseResultRepository.deleteByUserRequestOid(oid)
         userRequestRepository.deleteById(oid)
+    }
+
+    fun getNextOrderNumber(): Int {
+        return userRequestRepository.findMaxOid() + 1
+    }
+
+    @Transactional(readOnly = true)
+    fun getRecommendationDetail(oid: Int): RecommendationDetailResponse {
+        val userRequest = userRequestRepository.findById(oid)
+            .orElseThrow { IllegalArgumentException("Order not found with ID: $oid") }
+        
+        val result = responseResultRepository.findByUserRequestOid(oid)
+            ?: throw IllegalArgumentException("Result not found for Order ID: $oid")
+
+        return RecommendationDetailResponse(
+            oid = userRequest.oid!!,
+            orderDate = userRequest.orderDate,
+            weatherValue = userRequest.weatherValue,
+            moodValue = userRequest.moodValue,
+            abvValue = userRequest.abvValue,
+            additionalValue = userRequest.additionalValue,
+            flexFlag = userRequest.flexFlag,
+            mainTag = userRequest.mainTag,
+            whiskeyName = result.whiskeyName,
+            whiskeyNameEn = result.whiskeyNameEn,
+            whiskeyCategory = result.whiskeyCategory,
+            featureTags = result.featureTags,
+            foodName = result.foodName,
+            pairingNote = result.pairingNote,
+            bartenderWord = result.bartenderWord
+        )
     }
 }

@@ -23,17 +23,17 @@ class ResponseResult(
     var user: User,
 
     @Column(name = "w_name")
-    var whiskyName: String,
+    var whiskeyName: String,
 
     @Column(name = "w_name_en")
-    var whiskyNameEn: String?,
+    var whiskeyNameEn: String?,
 
     @Column(name = "w_category")
-    var classification: String?,
+    var whiskeyCategory: String?,
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "w_flavor", columnDefinition = "JSONB")
-    var featureTags: String?,
+    var featureTags: List<String>?,
 
     @Column(name = "w_region")
     var regionId: Int?,

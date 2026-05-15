@@ -1,6 +1,7 @@
 package com.turt1e18.rwhiskey.rwhiskey.api.config
 
 import com.turt1e18.rwhiskey.rwhiskey.api.auth.security.CustomUserDetailService
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.authentication.AuthenticationManager
@@ -17,7 +18,11 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 
 @Configuration
-class SecurityBeanConfig(private val customUserDetailService: CustomUserDetailService) {
+class SecurityBeanConfig(
+    private val customUserDetailService: CustomUserDetailService,
+    @param:Value("\${app.security.csrf.enabled:true}") private val csrfEnabled: Boolean,
+    @param:Value("\${app.cors.allowed-origins}") private val allowedOrigins: String
+) {
 
     @Bean
     fun passwordEncoder(): PasswordEncoder {
@@ -39,8 +44,8 @@ class SecurityBeanConfig(private val customUserDetailService: CustomUserDetailSe
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
-        configuration.allowedOrigins = listOf("http://localhost:3000", "http://localhost:5173") // React, Vite 기본 포트
-        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
+        configuration.allowedOrigins = allowedOrigins.split(",")
+        configuration.allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
         configuration.allowedHeaders = listOf("*")
         configuration.allowCredentials = true // 세션 쿠키 허용
         val source = UrlBasedCorsConfigurationSource()
@@ -49,9 +54,8 @@ class SecurityBeanConfig(private val customUserDetailService: CustomUserDetailSe
     }
 
     @Bean
-    fun filterChain(http: HttpSecurity): SecurityFilterChain =
+    fun filterChain(http: HttpSecurity): SecurityFilterChain {
         http.httpBasic { it.disable() }
-            .csrf { it.disable() } // 배포시 수정
             .cors { it.configurationSource(corsConfigurationSource()) }
             .formLogin { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) }
@@ -59,5 +63,14 @@ class SecurityBeanConfig(private val customUserDetailService: CustomUserDetailSe
                 it.requestMatchers("/api/health/**", "/api/auth/**").permitAll()
                 it.anyRequest().authenticated()
             }
-            .build()
+
+        if (!csrfEnabled) {
+            http.csrf { it.disable() }
+        } else {
+            // 운영 환경에서는 CSRF 활성화하되, 인증 관련 API는 편의상 제외하거나 토큰 방식 검토
+            http.csrf { it.ignoringRequestMatchers("/api/auth/**") }
+        }
+
+        return http.build()
+    }
 }

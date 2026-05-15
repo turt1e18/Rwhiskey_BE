@@ -42,3 +42,4 @@ out/
 application-local.properties
 .env
 .env.local
+.env.production

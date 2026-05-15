@@ -31,6 +31,9 @@ class UserRequest(
     @Column(name = "flex_flag")
     var flexFlag: Boolean = false,
 
+    @Column(name = "main_tag")
+    var mainTag: String? = null,
+
     @Column(name = "order_date")
     var orderDate: LocalDateTime = LocalDateTime.now()
 )

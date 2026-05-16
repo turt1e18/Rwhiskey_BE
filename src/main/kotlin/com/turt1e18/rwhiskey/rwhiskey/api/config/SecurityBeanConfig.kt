@@ -76,8 +76,20 @@ class SecurityBeanConfig(
             http.csrf { it.disable() }
         } else {
             // 운영 및 로컬 환경 모두에서 프론트엔드(fetch/axios)가 토큰을 읽고 즉시 사용할 수 있도록 설정
+            val repository = CookieCsrfTokenRepository.withHttpOnlyFalse()
+            
+            // [중요] CSRF 쿠키도 세션 쿠키와 동일한 도메인/보안 설정을 따라야 함
+            if (allowedOrigins.contains("turt1e18.work")) {
+                repository.setCookieCustomizer { builder ->
+                    builder.domain("turt1e18.work")
+                           .sameSite("None")
+                           .secure(true)
+                           .path("/")
+                }
+            }
+
             http.csrf { csrf ->
-                csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                csrf.csrfTokenRepository(repository)
                     .csrfTokenRequestHandler(requestHandler)
                     .ignoringRequestMatchers("/api/auth/**")
             }

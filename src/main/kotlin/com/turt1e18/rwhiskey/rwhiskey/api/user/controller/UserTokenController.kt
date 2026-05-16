@@ -39,7 +39,8 @@ class UserTokenController(
         return if (success) {
             ResponseEntity.ok(mapOf("success" to true, "message" to "Token decremented"))
         } else {
-            ResponseEntity.status(403).body(mapOf("success" to false, "message" to "Daily limit reached"))
+            // 403 대신 429(Too Many Requests)를 반환하여 보안 에러와 구분
+            ResponseEntity.status(429).body(mapOf("success" to false, "message" to "Daily limit reached"))
         }
     }
 

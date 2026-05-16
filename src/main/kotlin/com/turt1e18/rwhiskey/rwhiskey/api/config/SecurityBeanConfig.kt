@@ -12,6 +12,7 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
@@ -67,8 +68,11 @@ class SecurityBeanConfig(
         if (!csrfEnabled) {
             http.csrf { it.disable() }
         } else {
-            // 운영 환경에서는 CSRF 활성화하되, 인증 관련 API는 편의상 제외하거나 토큰 방식 검토
-            http.csrf { it.ignoringRequestMatchers("/api/auth/**") }
+            // 운영 환경에서는 CSRF 활성화하되, 프론트엔드가 토큰을 읽을 수 있도록 Cookie 방식 적용
+            http.csrf { csrf ->
+                csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                    .ignoringRequestMatchers("/api/auth/**")
+            }
         }
 
         return http.build()

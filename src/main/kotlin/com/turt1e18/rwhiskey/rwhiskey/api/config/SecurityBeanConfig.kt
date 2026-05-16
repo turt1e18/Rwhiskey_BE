@@ -12,7 +12,10 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
+import org.springframework.security.web.csrf.CsrfToken
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
@@ -56,6 +59,10 @@ class SecurityBeanConfig(
 
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
+        // CSRF 토큰을 지연 없이 즉시 쿠키로 처리하기 위한 핸들러
+        val requestHandler = CsrfTokenRequestAttributeHandler()
+        requestHandler.setCsrfRequestAttributeName(null) 
+
         http.httpBasic { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
             .formLogin { it.disable() }
@@ -68,12 +75,20 @@ class SecurityBeanConfig(
         if (!csrfEnabled) {
             http.csrf { it.disable() }
         } else {
-            // 운영 환경에서는 CSRF 활성화하되, 프론트엔드가 토큰을 읽을 수 있도록 Cookie 방식 적용
+            // 운영 및 로컬 환경 모두에서 프론트엔드(fetch/axios)가 토큰을 읽고 즉시 사용할 수 있도록 설정
             http.csrf { csrf ->
                 csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                    .csrfTokenRequestHandler(requestHandler)
                     .ignoringRequestMatchers("/api/auth/**")
             }
         }
+
+        // 모든 요청에 대해 CSRF 토큰을 명시적으로 해결하여 쿠키에 즉시 반영되도록 보장하는 필터
+        http.addFilterAfter({ request, response, chain ->
+            val token = request.getAttribute(CsrfToken::class.java.name) as? CsrfToken
+            token?.token // 명시적으로 getter를 호출하여 생성을 트리거함
+            chain.doFilter(request, response)
+        }, BasicAuthenticationFilter::class.java)
 
         return http.build()
     }

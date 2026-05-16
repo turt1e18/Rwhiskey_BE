@@ -4,6 +4,7 @@ import com.turt1e18.rwhiskey.rwhiskey.api.auth.security.CustomUserDetailService
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpMethod
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration
@@ -68,6 +69,7 @@ class SecurityBeanConfig(
             .formLogin { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) }
             .authorizeHttpRequests {
+                it.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 it.requestMatchers("/api/health/**", "/api/auth/**").permitAll()
                 it.anyRequest().authenticated()
             }

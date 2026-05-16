@@ -13,14 +13,13 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
+import org.springframework.security.web.csrf.CsrfFilter
 import org.springframework.security.web.csrf.CsrfToken
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
-
 
 @Configuration
 class SecurityBeanConfig(
@@ -52,7 +51,7 @@ class SecurityBeanConfig(
         configuration.allowedOrigins = allowedOrigins.split(",")
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
         configuration.allowedHeaders = listOf("*")
-        configuration.allowCredentials = true // 세션 쿠키 허용
+        configuration.allowCredentials = true // 프론트의 credentials: 'include' 허용 (세션 및 CSRF 쿠키 전송)
         val source = UrlBasedCorsConfigurationSource()
         source.registerCorsConfiguration("/**", configuration)
         return source
@@ -60,15 +59,16 @@ class SecurityBeanConfig(
 
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
-        // CSRF 토큰을 지연 없이 즉시 쿠키로 처리하기 위한 핸들러
+        // Spring Security 6: SPA 대응을 위해 CSRF 지연 해제 핸들러 설정
         val requestHandler = CsrfTokenRequestAttributeHandler()
-        requestHandler.setCsrfRequestAttributeName(null) 
+        requestHandler.setCsrfRequestAttributeName(null)
 
         http.httpBasic { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
             .formLogin { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED) }
             .authorizeHttpRequests {
+                // OPTIONS(Preflight) 요청은 필터 통과를 위해 무조건 허용
                 it.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 it.requestMatchers("/api/health/**", "/api/auth/**").permitAll()
                 it.anyRequest().authenticated()
@@ -77,16 +77,16 @@ class SecurityBeanConfig(
         if (!csrfEnabled) {
             http.csrf { it.disable() }
         } else {
-            // 운영 및 로컬 환경 모두에서 프론트엔드(fetch/axios)가 토큰을 읽고 즉시 사용할 수 있도록 설정
+            // 프론트엔드 자바스크립트가 쿠키를 읽어 헤더에 세팅할 수 있도록 HttpOnly=false 강제
             val repository = CookieCsrfTokenRepository.withHttpOnlyFalse()
-            
-            // [중요] CSRF 쿠키도 세션 쿠키와 동일한 도메인/보안 설정을 따라야 함
+
+            // 운영 환경(turt1e18.work)일 경우 교차 서브도메인 쿠키 정책 강제 적용
             if (allowedOrigins.contains("turt1e18.work")) {
                 repository.setCookieCustomizer { builder ->
-                    builder.domain("turt1e18.work")
-                           .sameSite("None")
-                           .secure(true)
-                           .path("/")
+                    builder.domain("turt1e18.work") // 세션 도메인과 일치시킴
+                        .sameSite("None")        // HTTPS 교차 도메인 쿠키 전송 허용
+                        .secure(true)            // Cloudflare 환경 필수
+                        .path("/")
                 }
             }
 
@@ -97,12 +97,13 @@ class SecurityBeanConfig(
             }
         }
 
-        // 모든 요청에 대해 CSRF 토큰을 명시적으로 해결하여 쿠키에 즉시 반영되도록 보장하는 필터
+        // 모든 요청에 대해 CSRF 토큰 생성을 강제하여 즉시 브라우저 쿠키에 반영되도록 하는 커스텀 필터
+        // (기존 BasicAuthenticationFilter 대신 CsrfFilter 직후에 배치하여 타이밍 이슈 차단)
         http.addFilterAfter({ request, response, chain ->
             val token = request.getAttribute(CsrfToken::class.java.name) as? CsrfToken
             token?.token // 명시적으로 getter를 호출하여 생성을 트리거함
             chain.doFilter(request, response)
-        }, BasicAuthenticationFilter::class.java)
+        }, CsrfFilter::class.java)
 
         return http.build()
     }

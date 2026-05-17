@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 
 @SpringBootApplication
+@org.springframework.scheduling.annotation.EnableAsync
 class Application
 
 fun main(args: Array<String>) {

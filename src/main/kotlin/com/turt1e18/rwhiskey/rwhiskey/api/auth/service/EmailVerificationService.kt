@@ -58,7 +58,6 @@ class EmailVerificationService(
             val response = resend.emails().send(params)
 
             println("성공적으로 전송했습니다.: ${response.id}")
-            println("생성된 코드: $code")
 
 
             EmailVerificationResponse(

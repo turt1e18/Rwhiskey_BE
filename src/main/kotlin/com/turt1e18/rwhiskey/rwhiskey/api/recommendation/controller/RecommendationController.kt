@@ -30,16 +30,18 @@ class RecommendationController(
 
     @GetMapping("/{oid}")
     fun getRecommendation(
+        @AuthenticationPrincipal principal: CustomUserPrincipal,
         @PathVariable oid: Int
     ): ResponseEntity<RecommendationDetailResponse> {
-        return ResponseEntity.ok(recommendationService.getRecommendationDetail(oid))
+        return ResponseEntity.ok(recommendationService.getRecommendationDetail(principal.uid, oid))
     }
 
     @DeleteMapping("/{oid}")
     fun deleteRecommendation(
+        @AuthenticationPrincipal principal: CustomUserPrincipal,
         @PathVariable oid: Int
     ): ResponseEntity<Void> {
-        recommendationService.deleteRecommendation(oid)
+        recommendationService.deleteRecommendation(principal.uid, oid)
         return ResponseEntity.noContent().build()
     }
 }

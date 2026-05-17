@@ -136,9 +136,16 @@ class RecommendationService(
         }
 
     @Transactional
-    fun deleteRecommendation(oid: Int) {
+    fun deleteRecommendation(uid: Int, oid: Int) {
+        val userRequest = userRequestRepository.findById(oid)
+            .orElseThrow { IllegalArgumentException("Order not found with ID: $oid") }
+
+        if (userRequest.user.uid != uid) {
+            throw IllegalArgumentException("해당 추천 결과에 대한 접근 권한이 없습니다.")
+        }
+
         responseResultRepository.deleteByUserRequestOid(oid)
-        userRequestRepository.deleteById(oid)
+        userRequestRepository.delete(userRequest)
     }
 
     fun getNextOrderNumber(): Int {
@@ -146,10 +153,14 @@ class RecommendationService(
     }
 
     @Transactional(readOnly = true)
-    fun getRecommendationDetail(oid: Int): RecommendationDetailResponse {
+    fun getRecommendationDetail(uid: Int, oid: Int): RecommendationDetailResponse {
         val userRequest = userRequestRepository.findById(oid)
             .orElseThrow { IllegalArgumentException("Order not found with ID: $oid") }
-        
+
+        if (userRequest.user.uid != uid) {
+            throw IllegalArgumentException("해당 추천 결과에 대한 접근 권한이 없습니다.")
+        }
+
         val result = responseResultRepository.findByUserRequestOid(oid)
             ?: throw IllegalArgumentException("Result not found for Order ID: $oid")
 

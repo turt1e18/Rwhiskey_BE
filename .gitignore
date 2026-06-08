@@ -33,6 +33,15 @@ out/
 /nbdist/
 /.nb-gradle/
 
+### config markdown ###
+API_CONTRACT.md
+BOOKMARK_API_SPEC.md
+DATA_FLOW_GUIDE.md
+DEBUG_LOG.md
+FRONTEND_API_SPEC.md
+WORK_LOG.md
+*I.md
+
 ### VS Code ###
 .vscode/
 
@@ -43,3 +52,4 @@ application-local.properties
 .env
 .env.local
 .env.production
+local.properties

@@ -71,7 +71,13 @@ class SecurityBeanConfig(
                 // OPTIONS(Preflight) 요청은 필터 통과를 위해 무조건 허용
                 it.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 it.requestMatchers("/api/health/**", "/api/auth/**").permitAll()
-                it.anyRequest().authenticated()
+                
+                // CSRF가 비활성화된 경우(로컬 개발 등) 모든 요청 허용, 아니면 인증 필요
+                if (!csrfEnabled) {
+                    it.anyRequest().permitAll()
+                } else {
+                    it.anyRequest().authenticated()
+                }
             }
 
         if (!csrfEnabled) {
